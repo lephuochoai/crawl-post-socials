@@ -1,0 +1,48 @@
+# Secret detection
+include:
+  - project: foundation/templates/ci-template
+    file: secret-detection.yml
+
+stages:
+  - scan_secret
+  - dockerize
+  - deploy
+
+##### Dockerize template
+.dockerize_template: &dockerize
+  stage: dockerize
+  image: $KANIKO_RUNNER_IMAGE
+  script:
+    - sh ./scripts/dockerize.sh
+  tags:
+    - vm-docker
+  allow_failure: false
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "dev" || $CI_COMMIT_BRANCH == "deploy"'
+    - when: never
+
+##### Deploy template
+.deploy_template: &deploy
+  stage: deploy
+  image: $RUNNER_IMAGE
+  tags:
+    - vm-docker
+  script:
+    - sh ./scripts/deploy.sh
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "dev" || $CI_COMMIT_BRANCH == "deploy"'
+    - when: never
+
+dockerize:be:
+  <<: *dockerize
+  variables:
+    DOCKERFILE: Dockerfile
+  needs:
+    - job: secret_detection
+      optional: true
+
+deploy:be:
+  <<: *deploy
+  needs:
+    - job: dockerize:be
+      optional: true

@@ -1,0 +1,20 @@
+version: "3.3"
+services:
+  admin-be:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: admin-be
+    restart: unless-stopped
+    ports:
+      - "${PORT}:${PORT}"
+    env_file:
+      - .env
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - rabid
+
+networks:
+  rabid:
+    driver: bridge
