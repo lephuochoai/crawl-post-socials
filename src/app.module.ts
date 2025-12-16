@@ -11,6 +11,7 @@ import { load } from './configs';
 import { HttpModule } from '@nestjs/axios';
 
 import { SentryGlobalFilter, SentryModule } from '@sentry/nestjs/setup';
+import { CrawlModule } from './modules/crawl/crawl.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { SentryGlobalFilter, SentryModule } from '@sentry/nestjs/setup';
     OrmModule,
     TerminusModule,
     HttpModule,
+    CrawlModule,
   ],
   controllers: [AppController],
   providers: [

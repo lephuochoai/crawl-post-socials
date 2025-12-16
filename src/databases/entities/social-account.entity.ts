@@ -1,6 +1,6 @@
 import { Column, Entity, ManyToOne, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 import { BaseEntity } from './base/base.entity';
-import { Influencer, Social, Media } from '.';
+import { Influencer, Social, Post } from '.';
 
 @Entity('social_accounts')
 export class SocialAccount extends BaseEntity {
@@ -23,10 +23,10 @@ export class SocialAccount extends BaseEntity {
   lastCrawlTime: Date;
 
   @OneToMany(
-    () => Media,
-    (media) => media.socialAccount
+    () => Post,
+    (post) => post.socialAccount
   )
-  medias: Media[];
+  posts: Post[];
 
   @ManyToOne(
     () => Influencer,
