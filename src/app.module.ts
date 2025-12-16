@@ -11,6 +11,7 @@ import { load } from './configs';
 import { HttpModule } from '@nestjs/axios';
 
 import { SentryGlobalFilter, SentryModule } from '@sentry/nestjs/setup';
+import { FileModule } from './modules/file/file.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { SentryGlobalFilter, SentryModule } from '@sentry/nestjs/setup';
     OrmModule,
     TerminusModule,
     HttpModule,
+    FileModule,
   ],
   controllers: [AppController],
   providers: [
