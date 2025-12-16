@@ -1,0 +1,20 @@
+import { Logger } from '@nestjs/common';
+import { DataSource } from 'typeorm';
+import { Influencer } from '@/databases/entities';
+
+const influencersData = [
+  { name: 'Cristiano Ronaldo' },
+  // Bạn có thể thêm influencer khác vào đây, ví dụ:
+  // { name: 'Lionel Messi' },
+];
+
+export const seedInfluencers = async (dataSource: DataSource, logger: Logger) => {
+  const influencerRepo = dataSource.getRepository(Influencer);
+
+  for (const data of influencersData) {
+    const influencer = new Influencer();
+    influencer.name = data.name;
+    await influencerRepo.save(influencer);
+    logger.log(`✅ Created Influencer: ${data.name}`);
+  }
+};
