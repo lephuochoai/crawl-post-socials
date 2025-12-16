@@ -18,7 +18,7 @@ import entities from './databases';
           password: configService.get('database.password'),
           database: configService.get('database.database'),
           entities: entities,
-          synchronize: false,
+          synchronize: true,
           migrationsRun: false,
           dropSchema: false,
           logging: configService.get('database.logging'),
