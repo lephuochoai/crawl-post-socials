@@ -19,8 +19,17 @@ export class SocialAccount extends BaseEntity {
   @Column({ type: 'varchar', length: 255, nullable: true, unique: true })
   platformUserId: string;
 
+  @Column({ type: 'text', nullable: true })
+  bio: string;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  followingCount: string;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  followersCount: string;
+
   @Column({ type: 'timestamp', nullable: true })
-  lastCrawlTime: Date;
+  joinDate: Date;
 
   @OneToMany(
     () => Post,

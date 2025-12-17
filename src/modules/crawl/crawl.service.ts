@@ -5,10 +5,11 @@ const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 import { Repository } from 'typeorm';
 import { Post, SocialAccount, Influencer, Social } from '@/databases/entities';
 import { SocialPlatform } from '@/shared/enums';
+import { CrawlPostDto } from './dto/crawl-post.dto';
 
 @Injectable()
 export class CrawlService implements OnModuleInit {
-  private readonly maxCollectCount = 7;
+  private readonly maxCollectCount = 10;
   private readonly logger = new Logger(CrawlService.name);
 
   private browser;
@@ -41,21 +42,20 @@ export class CrawlService implements OnModuleInit {
     await page.goto('https://twitter.com');
   }
 
-  async crawlVideoPosts(username: string) {
-    this.logger.log(`Starting crawl for username: ${username}`);
+  async crawlVideoPosts(crawlDto: CrawlPostDto) {
+    const { username, maxCollectCount } = crawlDto;
+    const limit = maxCollectCount || this.maxCollectCount;
+    this.logger.log(`Starting crawl for username: ${username} with limit: ${limit}`);
     const page = await this.browser.newPage();
     await page.setViewport({ width: 1280, height: 800 });
 
     try {
-      // 1. Navigate to profile to get Name
       const profileUrl = `https://twitter.com/${username}`;
       this.logger.log(`Navigating to profile: ${profileUrl}`);
       await page.goto(profileUrl, { waitUntil: 'networkidle2' });
 
-      // Wait for name selector
       await page.waitForSelector('div[data-testid="UserName"] span', { timeout: 10000 });
 
-      // Extract Name (first span usually)
       const displayName = await page.evaluate(() => {
         const nameEl = document.querySelector('div[data-testid="UserName"] span span');
         return nameEl ? nameEl.textContent : null;
@@ -66,7 +66,31 @@ export class CrawlService implements OnModuleInit {
       }
       this.logger.log(`Extracted name: ${displayName}`);
 
-      // 2. Find or Create Influencer
+      const { bio, followingCount, followersCount, joinDate } = await page.evaluate(() => {
+        const bioEl = document.querySelector('div[data-testid="UserDescription"]');
+        const followingEl = document.querySelector('a[href$="/following"] span span');
+        const followersEl =
+          document.querySelector('a[href$="/verified_followers"] span span') ||
+          document.querySelector('a[href$="/followers"] span span');
+        let joinDateEl = document.querySelector('span[data-testid="UserJoinDate"]');
+
+        if (!joinDateEl) {
+          const spans = Array.from(document.querySelectorAll('span'));
+          joinDateEl = spans.find((span) => span.textContent && span.textContent.includes('Joined')) || null;
+        }
+
+        return {
+          bio: bioEl ? bioEl.textContent : null,
+          followingCount: followingEl ? followingEl.textContent : null,
+          followersCount: followersEl ? followersEl.textContent : null,
+          joinDate: joinDateEl ? joinDateEl.textContent : null,
+        };
+      });
+
+      this.logger.log(
+        `Extracted info - Bio: ${bio}, Following: ${followingCount}, Followers: ${followersCount}, Join: ${joinDate}`
+      );
+
       let influencer = await this.influencerRepository.findOne({ where: { name: displayName } });
       if (!influencer) {
         this.logger.log(`Creating new influencer: ${displayName}`);
@@ -74,11 +98,22 @@ export class CrawlService implements OnModuleInit {
         await this.influencerRepository.save(influencer);
       }
 
-      // 3. Find or Create SocialAccount
-      // Find Social entity for Twitter
       const twitterSocial = await this.socialRepository.findOne({ where: { platform: SocialPlatform.TWITTER } });
       if (!twitterSocial) {
         throw new Error('Twitter social platform not found in DB');
+      }
+
+      let parsedJoinDate: Date | null = null;
+      if (joinDate) {
+        try {
+          const dateStr = joinDate.replace('Joined ', '');
+          parsedJoinDate = new Date(dateStr);
+          if (isNaN(parsedJoinDate.getTime())) {
+            parsedJoinDate = null;
+          }
+        } catch (e) {
+          this.logger.warn(`Failed to parse join date: ${joinDate}`);
+        }
       }
 
       let socialAccount = await this.socialAccountRepository.findOne({ where: { username } });
@@ -89,18 +124,25 @@ export class CrawlService implements OnModuleInit {
           influencer,
           social: twitterSocial,
           platformUserId: '',
+          bio,
+          followingCount,
+          followersCount,
+          joinDate: parsedJoinDate,
         });
         await this.socialAccountRepository.save(socialAccount);
       } else {
-        // Ensure link to influencer is correct if it was missing
+        socialAccount.bio = bio;
+        socialAccount.followingCount = followingCount;
+        socialAccount.followersCount = followersCount;
+        socialAccount.joinDate = parsedJoinDate;
+
         if (!socialAccount.influencer) {
           socialAccount.influencer = influencer;
-          await this.socialAccountRepository.save(socialAccount);
         }
+        await this.socialAccountRepository.save(socialAccount);
       }
 
-      // 4. Crawl Tweets Logic (Reused)
-      await this.crawlAccount(socialAccount, page);
+      await this.crawlAccount(socialAccount, page, limit);
     } catch (error) {
       this.logger.error(`Error processing account ${username}`, error);
       throw error;
@@ -109,7 +151,7 @@ export class CrawlService implements OnModuleInit {
     }
   }
 
-  private async crawlAccount(account: SocialAccount, page: any) {
+  private async crawlAccount(account: SocialAccount, page: any, limit: number) {
     try {
       const oldestPost = await this.postRepository.findOne({
         where: { socialAccountId: account.id },
@@ -137,12 +179,12 @@ export class CrawlService implements OnModuleInit {
       let collectedCount = 0;
       let noNewTweetsCount = 0;
 
-      while (collectedCount < this.maxCollectCount && noNewTweetsCount < 30) {
+      while (collectedCount < limit && noNewTweetsCount < 30) {
         await page.evaluate(() => {
-          const scrollAmount = Math.floor(Math.random() * 500) + 300; // Random scroll 300-800px
+          const scrollAmount = Math.floor(Math.random() * 500) + 300;
           window.scrollBy(0, scrollAmount);
         });
-        await new Promise((r) => setTimeout(r, Math.floor(Math.random() * 1000) + 1000)); // Random wait 1-2s
+        await new Promise((r) => setTimeout(r, Math.floor(Math.random() * 1000) + 1000));
 
         const newTweets = await page.evaluate(() => {
           const items = [];
@@ -195,9 +237,8 @@ export class CrawlService implements OnModuleInit {
 
         let addedInThisStep = 0;
         for (const tweet of newTweets) {
-          if (collectedCount >= this.maxCollectCount) break;
+          if (collectedCount >= limit) break;
 
-          // Check if we already have this tweet
           const exists = await this.postRepository.findOne({ where: { tweetId: tweet.tweetId } });
           if (!exists) {
             if (minTweetId && tweet.tweetId >= minTweetId) {

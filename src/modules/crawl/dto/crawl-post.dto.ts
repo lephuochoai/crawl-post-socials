@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsString } from 'class-validator';
+import { IsNotEmpty, IsString, IsNumber, IsOptional } from 'class-validator';
 
 export class CrawlPostDto {
   @ApiProperty({
@@ -9,4 +9,13 @@ export class CrawlPostDto {
   @IsString()
   @IsNotEmpty()
   username: string;
+
+  @ApiProperty({
+    description: 'The maximum number of tweets to collect',
+    example: 10,
+    required: false,
+  })
+  @IsOptional()
+  @IsNumber()
+  maxCollectCount?: number;
 }
