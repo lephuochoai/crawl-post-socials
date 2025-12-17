@@ -1,4 +1,5 @@
 import './instrument';
+import { join } from 'path';
 import { RequestMethod, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestApplication, NestFactory } from '@nestjs/core';
@@ -18,6 +19,10 @@ async function bootstrap() {
     cors: true,
     bufferLogs: true,
     logger,
+  });
+
+  app.useStaticAssets(join(process.cwd(), 'public'), {
+    prefix: '/public/',
   });
 
   const configService = app.get(ConfigService);

@@ -25,8 +25,11 @@ export class Post extends BaseEntity {
   @Column({ type: 'bigint' })
   socialAccountId: number;
 
-  @Column({ type: 'boolean' })
+  @Column({ type: 'boolean', default: false })
   isDownloaded: boolean;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  filePath: string | null;
 
   @ManyToOne(
     () => SocialAccount,
