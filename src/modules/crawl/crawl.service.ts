@@ -6,6 +6,7 @@ import { Repository } from 'typeorm';
 import { Post, SocialAccount, Influencer, Social } from '@/databases/entities';
 import { SocialPlatform } from '@/shared/enums';
 import { CrawlPostDto } from './dto/crawl-post.dto';
+import { parseSocialCount } from '@/utils/string.util';
 
 @Injectable()
 export class CrawlService implements OnModuleInit {
@@ -116,6 +117,9 @@ export class CrawlService implements OnModuleInit {
         }
       }
 
+      const parsedFollowingCount = parseSocialCount(followingCount);
+      const parsedFollowersCount = parseSocialCount(followersCount);
+
       let socialAccount = await this.socialAccountRepository.findOne({ where: { username } });
       if (!socialAccount) {
         this.logger.log(`Creating new social account: ${username}`);
@@ -125,15 +129,15 @@ export class CrawlService implements OnModuleInit {
           social: twitterSocial,
           platformUserId: '',
           bio,
-          followingCount,
-          followersCount,
+          followingCount: parsedFollowingCount,
+          followersCount: parsedFollowersCount,
           joinDate: parsedJoinDate,
         });
         await this.socialAccountRepository.save(socialAccount);
       } else {
         socialAccount.bio = bio;
-        socialAccount.followingCount = followingCount;
-        socialAccount.followersCount = followersCount;
+        socialAccount.followingCount = parsedFollowingCount;
+        socialAccount.followersCount = parsedFollowersCount;
         socialAccount.joinDate = parsedJoinDate;
 
         if (!socialAccount.influencer) {

@@ -22,11 +22,11 @@ export class SocialAccount extends BaseEntity {
   @Column({ type: 'text', nullable: true })
   bio: string;
 
-  @Column({ type: 'varchar', length: 255, nullable: true })
-  followingCount: string;
+  @Column({ type: 'bigint', nullable: true })
+  followingCount: number;
 
-  @Column({ type: 'varchar', length: 255, nullable: true })
-  followersCount: string;
+  @Column({ type: 'bigint', nullable: true })
+  followersCount: number;
 
   @Column({ type: 'timestamp', nullable: true })
   joinDate: Date;
