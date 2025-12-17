@@ -46,6 +46,11 @@ export class DownloadSchedulerService {
         this.logger.log(`Processing batch ${batchIndex + 1}/${totalBatches}: ${batch.length} posts`);
         await this.queueService.addBulkDownloadVideoPostsJob(batch);
 
+        await this.postRepository.update(
+          batch.map((p) => p.id),
+          { isQueued: true }
+        );
+
         if (batchIndex < totalBatches - 1) {
           await new Promise((resolve) => setTimeout(resolve, 500));
         }
@@ -56,7 +61,11 @@ export class DownloadSchedulerService {
   }
 
   private async fetchPosts() {
-    const baseQuery = this.postRepository.createQueryBuilder('post').where('post.isDownloaded = false').getMany();
+    const baseQuery = this.postRepository
+      .createQueryBuilder('post')
+      .where('post.isDownloaded = false')
+      .andWhere('post.isQueued = false')
+      .getMany();
     return baseQuery;
   }
 }

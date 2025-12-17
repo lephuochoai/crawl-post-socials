@@ -194,7 +194,7 @@ export class CrawlService implements OnModuleInit, OnModuleDestroy {
     try {
       const profileUrl = `https://twitter.com/${username}`;
       this.logger.log(`Navigating to profile: ${profileUrl}`);
-      await page.goto(profileUrl, { waitUntil: 'networkidle2' });
+      await page.goto(profileUrl, { waitUntil: 'networkidle2', timeout: 20000 });
 
       await page.waitForSelector('div[data-testid="UserName"] span', { timeout: 10000 });
 
@@ -208,13 +208,14 @@ export class CrawlService implements OnModuleInit, OnModuleDestroy {
       }
       this.logger.log(`Extracted name: ${displayName}`);
 
-      const { bio, followingCount, followersCount, joinDate } = await page.evaluate(() => {
+      const { bio, followingCount, followersCount, joinDate, avatar } = await page.evaluate(() => {
         const bioEl = document.querySelector('div[data-testid="UserDescription"]');
         const followingEl = document.querySelector('a[href$="/following"] span span');
         const followersEl =
           document.querySelector('a[href$="/verified_followers"] span span') ||
           document.querySelector('a[href$="/followers"] span span');
         let joinDateEl = document.querySelector('span[data-testid="UserJoinDate"]');
+        const avatarEl = document.querySelector('a[href$="/photo"] img');
 
         if (!joinDateEl) {
           const spans = Array.from(document.querySelectorAll('span'));
@@ -226,11 +227,12 @@ export class CrawlService implements OnModuleInit, OnModuleDestroy {
           followingCount: followingEl ? followingEl.textContent : null,
           followersCount: followersEl ? followersEl.textContent : null,
           joinDate: joinDateEl ? joinDateEl.textContent : null,
+          avatar: avatarEl ? avatarEl.getAttribute('src') : null,
         };
       });
 
       this.logger.log(
-        `Extracted info - Bio: ${bio}, Following: ${followingCount}, Followers: ${followersCount}, Join: ${joinDate}`
+        `Extracted info - Bio: ${bio}, Following: ${followingCount}, Followers: ${followersCount}, Join: ${joinDate}, Avatar: ${avatar}`
       );
 
       let influencer = await this.influencerRepository.findOne({ where: { name: displayName } });
@@ -268,11 +270,12 @@ export class CrawlService implements OnModuleInit, OnModuleDestroy {
           username,
           influencer,
           social: twitterSocial,
-          platformUserId: '',
+          platformUserId: null,
           bio,
           followingCount: parsedFollowingCount,
           followersCount: parsedFollowersCount,
           joinDate: parsedJoinDate,
+          avatar,
         });
         await this.socialAccountRepository.save(socialAccount);
       } else {
@@ -280,6 +283,7 @@ export class CrawlService implements OnModuleInit, OnModuleDestroy {
         socialAccount.followingCount = parsedFollowingCount;
         socialAccount.followersCount = parsedFollowersCount;
         socialAccount.joinDate = parsedJoinDate;
+        socialAccount.avatar = avatar;
 
         if (!socialAccount.influencer) {
           socialAccount.influencer = influencer;
@@ -313,7 +317,7 @@ export class CrawlService implements OnModuleInit, OnModuleDestroy {
       }
 
       this.logger.log(`Navigating to: ${startUrl}`);
-      await page.goto(startUrl, { waitUntil: 'networkidle2' });
+      await page.goto(startUrl, { waitUntil: 'networkidle2', timeout: 60000 });
 
       try {
         await page.waitForSelector('div[data-testid="cellInnerDiv"]', { timeout: 10000 });

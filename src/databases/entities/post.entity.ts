@@ -28,6 +28,9 @@ export class Post extends BaseEntity {
   @Column({ type: 'boolean', default: false })
   isDownloaded: boolean;
 
+  @Column({ type: 'boolean', default: false })
+  isQueued: boolean;
+
   @Column({ type: 'varchar', length: 255, nullable: true })
   filePath: string | null;
 
