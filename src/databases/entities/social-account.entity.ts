@@ -1,6 +1,6 @@
 import { Column, Entity, ManyToOne, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 import { BaseEntity } from './base/base.entity';
-import { Influencer, Social, Media } from '.';
+import { Influencer, Social, Post } from '.';
 
 @Entity('social_accounts')
 export class SocialAccount extends BaseEntity {
@@ -19,14 +19,23 @@ export class SocialAccount extends BaseEntity {
   @Column({ type: 'varchar', length: 255, nullable: true, unique: true })
   platformUserId: string;
 
+  @Column({ type: 'text', nullable: true })
+  bio: string;
+
+  @Column({ type: 'bigint', nullable: true })
+  followingCount: number;
+
+  @Column({ type: 'bigint', nullable: true })
+  followersCount: number;
+
   @Column({ type: 'timestamp', nullable: true })
-  lastCrawlTime: Date;
+  joinDate: Date;
 
   @OneToMany(
-    () => Media,
-    (media) => media.socialAccount
+    () => Post,
+    (post) => post.socialAccount
   )
-  medias: Media[];
+  posts: Post[];
 
   @ManyToOne(
     () => Influencer,

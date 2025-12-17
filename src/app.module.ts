@@ -11,6 +11,9 @@ import { load } from './configs';
 import { HttpModule } from '@nestjs/axios';
 
 import { SentryGlobalFilter, SentryModule } from '@sentry/nestjs/setup';
+import { CrawlModule } from './modules/crawl/crawl.module';
+import { InfluencerModule } from './modules/influencer/influencer.module';
+import { AccountModule } from './modules/account/account.module';
 import { FileModule } from './modules/file/file.module';
 
 @Module({
@@ -24,6 +27,9 @@ import { FileModule } from './modules/file/file.module';
     OrmModule,
     TerminusModule,
     HttpModule,
+    CrawlModule,
+    InfluencerModule,
+    AccountModule,
     FileModule,
   ],
   controllers: [AppController],

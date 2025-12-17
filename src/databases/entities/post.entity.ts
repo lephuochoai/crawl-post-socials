@@ -2,16 +2,25 @@ import { Column, Entity, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
 import { BaseEntity } from './base/base.entity';
 import { SocialAccount } from './social-account.entity';
 
-@Entity('medias')
-export class Media extends BaseEntity {
+@Entity('posts')
+export class Post extends BaseEntity {
   @PrimaryGeneratedColumn({ type: 'bigint' })
   id: number;
 
-  @Column({ type: 'varchar', length: 10 })
-  type: 'VIDEO' | 'IMAGE';
-
   @Column({ type: 'text' })
   url: string;
+
+  @Column({ type: 'varchar', length: 255, unique: true })
+  tweetId: string;
+
+  @Column({ type: 'text', nullable: true })
+  title: string;
+
+  @Column({ type: 'text', array: true, nullable: true })
+  hashtags: string[];
+
+  @Column({ type: 'timestamp' })
+  postedAt: Date;
 
   @Column({ type: 'bigint' })
   socialAccountId: number;
@@ -24,7 +33,7 @@ export class Media extends BaseEntity {
 
   @ManyToOne(
     () => SocialAccount,
-    (socialAccount) => socialAccount.medias
+    (socialAccount) => socialAccount.posts
   )
   socialAccount: SocialAccount;
 }
