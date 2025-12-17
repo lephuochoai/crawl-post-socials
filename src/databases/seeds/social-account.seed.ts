@@ -10,7 +10,12 @@ const accountsData = [
     username: 'Cristiano',
     platformUserId: '155659213',
   },
-  // Thêm account khác vào đây
+  {
+    influencerName: 'Taylor Swift',
+    platform: SocialPlatform.TWITTER,
+    username: 'taylorswift13',
+    platformUserId: '17919972',
+  },
 ];
 
 export const seedSocialAccounts = async (dataSource: DataSource, logger: Logger) => {
