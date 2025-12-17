@@ -7,6 +7,9 @@ import { Post, SocialAccount, Influencer, Social } from '@/databases/entities';
 import { SocialPlatform } from '@/shared/enums';
 import { CrawlPostDto } from './dto/crawl-post.dto';
 import { parseSocialCount } from '@/utils/string.util';
+import { typeWithRandomDelay } from '@/utils/puppeteer.util';
+import { ConfigService } from '@nestjs/config';
+import { HackathonConfig } from '@/configs';
 
 @Injectable()
 export class CrawlService implements OnModuleInit, OnModuleDestroy {
@@ -14,6 +17,8 @@ export class CrawlService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(CrawlService.name);
 
   private browser;
+  private twitterGoogleEmail: string;
+  private twitterGooglePassword: string;
 
   constructor(
     @InjectRepository(Post)
@@ -23,10 +28,14 @@ export class CrawlService implements OnModuleInit, OnModuleDestroy {
     @InjectRepository(Influencer)
     private readonly influencerRepository: Repository<Influencer>,
     @InjectRepository(Social)
-    private readonly socialRepository: Repository<Social>
+    private readonly socialRepository: Repository<Social>,
+    private readonly configService: ConfigService<HackathonConfig>
   ) {}
 
   async onModuleInit() {
+    this.twitterGoogleEmail = this.configService.getOrThrow('main.twitterGoogleEmail', { infer: true });
+    this.twitterGooglePassword = this.configService.getOrThrow('main.twitterGooglePassword', { infer: true });
+
     if (process.argv.some((arg) => arg.includes('seed'))) {
       this.logger.log('Skipping browser launch in seed mode');
       return;
@@ -42,6 +51,8 @@ export class CrawlService implements OnModuleInit, OnModuleDestroy {
     const page = await this.browser.newPage();
     try {
       await page.goto('https://twitter.com');
+      await Promise.resolve(setTimeout(() => {}, 2000));
+      await this.loginWithGoogle(page);
     } catch (error) {
       this.logger.warn('Failed to navigate to twitter on init', error);
     }
@@ -50,6 +61,126 @@ export class CrawlService implements OnModuleInit, OnModuleDestroy {
   async onModuleDestroy() {
     if (this.browser) {
       await this.browser.close();
+    }
+  }
+
+  private async loginWithGoogle(page: any) {
+    try {
+      this.logger.log('Starting Google login flow...');
+
+      try {
+        if (page.url().includes('home')) {
+          this.logger.log('Already logged in (url check).');
+          return;
+        }
+
+        await Promise.race([
+          page.waitForSelector('div[data-testid="SideNav_AccountSwitcher_Button"]', { timeout: 15000 }),
+          page.waitForSelector('a[data-testid="AppTabBar_Home_Link"]', { timeout: 15000 }),
+          page.waitForSelector('div[data-testid="primaryColumn"]', { timeout: 15000 }),
+        ]);
+        this.logger.log('Already logged in.');
+        return;
+      } catch (e) {
+        this.logger.log('Not logged in.' + e);
+      }
+
+      this.logger.log('Waiting for Google Sign-In container...');
+
+      try {
+        const selector = 'div[data-testid="google_sign_in_container"]';
+        await page.waitForSelector(selector, { timeout: 20000 });
+
+        await page.click(selector);
+        this.logger.log('Clicked Google Sign-In container');
+      } catch (e) {
+        this.logger.error(
+          `Error finding Google button with selector div[data-testid="google_sign_in_container"] at ${page.url()}`,
+          e
+        );
+        return;
+      }
+
+      const newTarget = await this.browser.waitForTarget((target: any) => target.opener() === page.target());
+      const googlePage = await newTarget.page();
+
+      if (!googlePage) {
+        this.logger.error('Google popup page not found');
+        return;
+      }
+
+      this.logger.log('Waiting for popup to load...');
+      await new Promise((r) => setTimeout(r, 3000));
+
+      this.logger.log('Waiting for email input or account chooser...');
+      await new Promise((r) => setTimeout(r, 2000));
+      const emailInputSelector = 'input[type="email"]';
+      const targetEmail = this.twitterGoogleEmail;
+
+      try {
+        await googlePage.waitForFunction(
+          (selector, email) => {
+            return (
+              document.querySelector(selector) ||
+              Array.from(document.querySelectorAll('div')).some((el) => el.textContent?.trim() === email)
+            );
+          },
+          { timeout: 15000 },
+          emailInputSelector,
+          targetEmail
+        );
+      } catch (e) {
+        this.logger.warn('Timeout waiting for email input or account chooser');
+      }
+
+      const emailInput = await googlePage.$(emailInputSelector);
+
+      if (emailInput) {
+        this.logger.log('Email input found. Typing email...');
+        await typeWithRandomDelay(googlePage, emailInputSelector, targetEmail);
+        await googlePage.keyboard.press('Enter');
+      } else {
+        this.logger.log('Email input not found. Checking for account chooser...');
+        const clicked = await googlePage.evaluate((email) => {
+          const elements = Array.from(document.querySelectorAll('div'));
+          const target = elements.find((el) => el.textContent?.trim() === email);
+          if (target) {
+            target.click();
+            return true;
+          }
+          return false;
+        }, targetEmail);
+
+        if (clicked) {
+          this.logger.log(`Clicked account: ${targetEmail}`);
+        } else {
+          this.logger.warn('Could not find email input or account to click. Login might fail.');
+        }
+      }
+
+      try {
+        await googlePage.waitForSelector('input[type="password"]', { visible: true, timeout: 15000 });
+        this.logger.log('Password input found. Typing password...');
+        await typeWithRandomDelay(googlePage, 'input[type="password"]', this.twitterGooglePassword);
+        await googlePage.keyboard.press('Enter');
+      } catch (e) {
+        this.logger.log('Password input not found (or timed out). Assuming password skipped or already logged in.');
+      }
+
+      this.logger.log('Credentials entered. Waiting for login to complete...');
+
+      try {
+        await Promise.race([
+          page.waitForSelector('div[data-testid="SideNav_AccountSwitcher_Button"]', { timeout: 100000 }),
+          page.waitForSelector('a[data-testid="AppTabBar_Home_Link"]', { timeout: 100000 }),
+          page.waitForSelector('div[data-testid="primaryColumn"]', { timeout: 100000 }),
+        ]);
+        this.logger.log('Successfully logged in!');
+      } catch (error) {
+        this.logger.warn('Login verification timed out, but continuing to check if we can proceed...');
+      }
+    } catch (error) {
+      this.logger.error('Google login failed', error);
     }
   }
 
