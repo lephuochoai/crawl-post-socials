@@ -1,12 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Media } from '@/databases/entities/media.entity';
 import { getYtDlpPath } from '@/utils/yt-dlp.util';
 import * as path from 'path';
 import * as fs from 'fs';
 import { spawn } from 'child_process';
 import { v4 as uuidv4 } from 'uuid';
+import { Post } from '@/databases/entities';
 
 @Injectable()
 export class FileService {
@@ -14,8 +14,8 @@ export class FileService {
   private readonly publicDir = path.join(process.cwd(), 'public');
 
   constructor(
-    @InjectRepository(Media)
-    private readonly mediaRepository: Repository<Media>
+    @InjectRepository(Post)
+    private readonly postRepository: Repository<Post>
   ) {
     this.ensurePublicDir();
   }
@@ -93,7 +93,7 @@ export class FileService {
 
           try {
             // Update DB only if successful
-            await this.mediaRepository.update(mediaId, {
+            await this.postRepository.update(mediaId, {
               filePath: relativePath,
               isDownloaded: true,
             });
