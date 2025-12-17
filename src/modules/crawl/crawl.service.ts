@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
+import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import puppeteer from 'puppeteer-extra';
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
@@ -9,7 +9,7 @@ import { CrawlPostDto } from './dto/crawl-post.dto';
 import { parseSocialCount } from '@/utils/string.util';
 
 @Injectable()
-export class CrawlService implements OnModuleInit {
+export class CrawlService implements OnModuleInit, OnModuleDestroy {
   private readonly maxCollectCount = 10;
   private readonly logger = new Logger(CrawlService.name);
 
@@ -35,12 +35,22 @@ export class CrawlService implements OnModuleInit {
     puppeteer.use(StealthPlugin());
     this.browser = await puppeteer.launch({
       headless: false,
-      // userDataDir: './user_data',
+      userDataDir: './user_data',
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
     });
 
     const page = await this.browser.newPage();
-    await page.goto('https://twitter.com');
+    try {
+      await page.goto('https://twitter.com');
+    } catch (error) {
+      this.logger.warn('Failed to navigate to twitter on init', error);
+    }
+  }
+
+  async onModuleDestroy() {
+    if (this.browser) {
+      await this.browser.close();
+    }
   }
 
   async crawlVideoPosts(crawlDto: CrawlPostDto) {

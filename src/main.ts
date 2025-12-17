@@ -21,6 +21,8 @@ async function bootstrap() {
     logger,
   });
 
+  app.enableShutdownHooks();
+
   app.useStaticAssets(join(process.cwd(), 'public'), {
     prefix: '/public/',
   });

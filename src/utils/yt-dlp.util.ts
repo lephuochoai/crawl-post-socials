@@ -11,15 +11,12 @@ export function getYtDlpPath(): string {
   switch (platform) {
     case 'win32':
       binaryName = 'yt-dlp.exe';
-      console.log('Windows: chạy script .bat hoặc .cmd');
       break;
     case 'linux':
       binaryName = 'yt-dlp_linux';
-      console.log('Linux: chạy shell script .sh');
       break;
     case 'darwin':
       binaryName = 'yt-dlp_macos';
-      console.log('macOS: chạy shell script .sh');
       break;
     default:
       throw new Error(`Unsupported platform: ${platform}`);
