@@ -43,8 +43,7 @@ export class CrawlService implements OnModuleInit, OnModuleDestroy {
 
     puppeteer.use(StealthPlugin());
     this.browser = await puppeteer.launch({
-      // headless: false,
-      headless: true,
+      headless: false,
       userDataDir: './user_data',
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
     });
