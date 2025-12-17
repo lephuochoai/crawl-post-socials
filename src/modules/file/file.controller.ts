@@ -14,7 +14,8 @@ export class FileController {
   @ApiResponse({ status: 201, description: 'Media downloaded successfully.' })
   async download(@Body() body: DownloadMediaDto, @Req() req: Request) {
     const { mediaId, url } = body;
-    const filePath = await this.fileService.downloadMedia(mediaId, url);
+    const filePath = await this.fileService.downloadMedia(url);
+
     const fullUrl = `${req.protocol}://${req.get('host')}/${filePath.replace(/\\/g, '/')}`;
 
     return {
