@@ -15,6 +15,8 @@ import { CrawlModule } from './modules/crawl/crawl.module';
 import { InfluencerModule } from './modules/influencer/influencer.module';
 import { AccountModule } from './modules/account/account.module';
 import { FileModule } from './modules/file/file.module';
+import { SchedulerModule } from './modules/scheduler/scheduler.module';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
@@ -24,6 +26,7 @@ import { FileModule } from './modules/file/file.module';
       load,
     }),
     SentryModule.forRoot(),
+    ScheduleModule.forRoot(),
     OrmModule,
     TerminusModule,
     HttpModule,
@@ -31,6 +34,7 @@ import { FileModule } from './modules/file/file.module';
     InfluencerModule,
     AccountModule,
     FileModule,
+    SchedulerModule,
   ],
   controllers: [AppController],
   providers: [

@@ -7,7 +7,7 @@ export class Post extends BaseEntity {
   @PrimaryGeneratedColumn({ type: 'bigint' })
   id: number;
 
-  @Column({ type: 'text' })
+  @Column({ type: 'text', unique: true })
   url: string;
 
   @Column({ type: 'varchar', length: 255, unique: true })
