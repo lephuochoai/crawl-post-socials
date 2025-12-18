@@ -307,8 +307,29 @@ export class CrawlService implements OnModuleInit, OnModuleDestroy {
         order: { postedAt: 'ASC' },
       });
 
+      const latestPost = await this.postRepository.findOne({
+        where: { socialAccountId: account.id },
+        order: { postedAt: 'DESC' },
+      });
+
+      let totalCollected = 0;
+
+      if (latestPost) {
+        this.logger.log(`[Phase 1] Checking for new posts since ${latestPost.tweetId}...`);
+        const startUrl = `https://twitter.com/search?q=from%3A${account.username}&src=typed_query&f=live`;
+
+        totalCollected += await this.processCrawlLoop(page, startUrl, limit, account, async (tweet) => {
+          return tweet.tweetId <= latestPost.tweetId;
+        });
+      }
+
+      if (totalCollected >= limit) {
+        this.logger.log(`Reached limit ${limit} in Phase 1. Stopping.`);
+        return;
+      }
+
+      this.logger.log(`[Phase 2] Backfilling older posts...`);
       let startUrl = `https://twitter.com/${account.username}`;
-      let minTweetId = oldestPost ? oldestPost.tweetId : null;
 
       if (oldestPost) {
         const date = oldestPost.postedAt.toISOString().split('T')[0];
@@ -316,110 +337,126 @@ export class CrawlService implements OnModuleInit, OnModuleDestroy {
         startUrl = `https://twitter.com/search?q=from%3A${account.username}%20until%3A${date}&src=typed_query&f=live`;
       }
 
-      this.logger.log(`Navigating to: ${startUrl}`);
-      await page.goto(startUrl, { waitUntil: 'networkidle2', timeout: 60000 });
-
-      try {
-        await page.waitForSelector('div[data-testid="cellInnerDiv"]', { timeout: 10000 });
-      } catch (e) {
-        this.logger.warn('Timeout waiting for tweets. Might be no results or login issue.');
+      if (!oldestPost && !latestPost) {
+        startUrl = `https://twitter.com/search?q=from%3A${account.username}&src=typed_query&f=live`;
       }
 
-      let collectedCount = 0;
-      let noNewTweetsCount = 0;
+      await this.processCrawlLoop(page, startUrl, limit - totalCollected, account, async () => false);
 
-      while (collectedCount < limit && noNewTweetsCount < 30) {
-        await page.evaluate(() => {
-          const scrollAmount = Math.floor(Math.random() * 500) + 300;
-          window.scrollBy(0, scrollAmount);
-        });
-        await new Promise((r) => setTimeout(r, Math.floor(Math.random() * 1000) + 1000));
-
-        const newTweets = await page.evaluate(() => {
-          const items = [];
-          const cells = document.querySelectorAll('div[data-testid="cellInnerDiv"]');
-
-          cells.forEach((cell) => {
-            const videoComponent = cell.querySelector('div[data-testid="videoComponent"]');
-            if (videoComponent) {
-              const links = Array.from(cell.querySelectorAll('a[href*="/status/"]'));
-              const timeElement = cell.querySelector('time');
-              const textElement = cell.querySelector('div[data-testid="tweetText"]');
-
-              let tweetUrl = '';
-              let tweetId = '';
-              for (const link of links) {
-                const href = link.getAttribute('href');
-                if (href && href.includes('/status/') && !href.includes('/analytics')) {
-                  tweetUrl = href.startsWith('http') ? href : `https://twitter.com${href}`;
-                  tweetId = tweetUrl.split('/status/')[1];
-                  break;
-                }
-              }
-
-              if (tweetUrl && timeElement) {
-                const datetime = timeElement.getAttribute('datetime');
-                const title = textElement ? textElement.textContent : '';
-
-                const hashtags = [];
-                if (textElement) {
-                  const hashtagLinks = textElement.querySelectorAll('a[href*="/hashtag/"]');
-                  hashtagLinks.forEach((a) => {
-                    hashtags.push(a.textContent);
-                  });
-                }
-
-                if (datetime) {
-                  items.push({
-                    url: tweetUrl,
-                    tweetId,
-                    date: datetime,
-                    title,
-                    hashtags,
-                  });
-                }
-              }
-            }
-          });
-          return items;
-        });
-
-        let addedInThisStep = 0;
-        for (const tweet of newTweets) {
-          if (collectedCount >= limit) break;
-
-          const exists = await this.postRepository.findOne({ where: { tweetId: tweet.tweetId } });
-          if (!exists) {
-            if (minTweetId && tweet.tweetId >= minTweetId) {
-              continue;
-            }
-
-            await this.postRepository.save({
-              url: tweet.url,
-              tweetId: tweet.tweetId,
-              title: tweet.title,
-              hashtags: tweet.hashtags,
-              postedAt: new Date(tweet.date),
-              socialAccountId: account.id,
-              isDownloaded: false,
-            });
-            collectedCount++;
-            addedInThisStep++;
-            this.logger.log(`Saved new tweet: ${tweet.tweetId}`);
-          }
-        }
-
-        if (addedInThisStep === 0) {
-          noNewTweetsCount++;
-        } else {
-          noNewTweetsCount = 0;
-        }
-      }
-
-      this.logger.log(`Finished account ${account.username}. Collected ${collectedCount} tweets.`);
+      this.logger.log(`Finished account ${account.username}. Total collected: ${totalCollected} (approx)`);
     } catch (error) {
       this.logger.error(`Error processing account ${account.username}`, error);
       throw error;
     }
+  }
+  private async processCrawlLoop(
+    page: any,
+    url: string,
+    limit: number,
+    account: SocialAccount,
+    shouldStop: (tweet: any) => Promise<boolean>
+  ): Promise<number> {
+    this.logger.log(`Navigating to: ${url}`);
+    await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
+
+    try {
+      await page.waitForSelector('div[data-testid="cellInnerDiv"]', { timeout: 10000 });
+    } catch (e) {
+      this.logger.warn('Timeout waiting for tweets. Might be no results or login issue.');
+      return 0;
+    }
+
+    let collectedCount = 0;
+    let noNewTweetsCount = 0;
+
+    while (collectedCount < limit && noNewTweetsCount < 30) {
+      await page.evaluate(() => {
+        const scrollAmount = Math.floor(Math.random() * 500) + 300;
+        window.scrollBy(0, scrollAmount);
+      });
+      await new Promise((r) => setTimeout(r, Math.floor(Math.random() * 1000) + 1000));
+
+      const newTweets = await page.evaluate(() => {
+        const items = [];
+        const cells = document.querySelectorAll('div[data-testid="cellInnerDiv"]');
+
+        cells.forEach((cell) => {
+          const videoComponent = cell.querySelector('div[data-testid="videoComponent"]');
+          if (videoComponent) {
+            const links = Array.from(cell.querySelectorAll('a[href*="/status/"]'));
+            const timeElement = cell.querySelector('time');
+            const textElement = cell.querySelector('div[data-testid="tweetText"]');
+
+            let tweetUrl = '';
+            let tweetId = '';
+            for (const link of links) {
+              const href = link.getAttribute('href');
+              if (href && href.includes('/status/') && !href.includes('/analytics')) {
+                tweetUrl = href.startsWith('http') ? href : `https://twitter.com${href}`;
+                tweetId = tweetUrl.split('/status/')[1];
+                break;
+              }
+            }
+
+            if (tweetUrl && timeElement) {
+              const datetime = timeElement.getAttribute('datetime');
+              const title = textElement ? textElement.textContent : '';
+
+              const hashtags = [];
+              if (textElement) {
+                const hashtagLinks = textElement.querySelectorAll('a[href*="/hashtag/"]');
+                hashtagLinks.forEach((a) => {
+                  hashtags.push(a.textContent);
+                });
+              }
+
+              if (datetime) {
+                items.push({
+                  url: tweetUrl,
+                  tweetId,
+                  date: datetime,
+                  title,
+                  hashtags,
+                });
+              }
+            }
+          }
+        });
+        return items;
+      });
+
+      let addedInThisStep = 0;
+      for (const tweet of newTweets) {
+        if (collectedCount >= limit) break;
+
+        if (await shouldStop(tweet)) {
+          this.logger.log(`Stop condition met at tweet ${tweet.tweetId}. Stopping phase.`);
+          return collectedCount;
+        }
+
+        const exists = await this.postRepository.findOne({ where: { tweetId: tweet.tweetId } });
+        if (!exists) {
+          await this.postRepository.save({
+            url: tweet.url,
+            tweetId: tweet.tweetId,
+            title: tweet.title,
+            hashtags: tweet.hashtags,
+            postedAt: new Date(tweet.date),
+            socialAccountId: account.id,
+            isDownloaded: false,
+          });
+          collectedCount++;
+          addedInThisStep++;
+          this.logger.log(`Saved new tweet: ${tweet.tweetId}`);
+        }
+      }
+
+      if (addedInThisStep === 0) {
+        noNewTweetsCount++;
+      } else {
+        noNewTweetsCount = 0;
+      }
+    }
+    return collectedCount;
   }
 }
