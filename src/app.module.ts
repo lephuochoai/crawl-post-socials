@@ -14,6 +14,9 @@ import { SentryGlobalFilter, SentryModule } from '@sentry/nestjs/setup';
 import { CrawlModule } from './modules/crawl/crawl.module';
 import { InfluencerModule } from './modules/influencer/influencer.module';
 import { AccountModule } from './modules/account/account.module';
+import { FileModule } from './modules/file/file.module';
+import { SchedulerModule } from './modules/scheduler/scheduler.module';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
@@ -23,12 +26,15 @@ import { AccountModule } from './modules/account/account.module';
       load,
     }),
     SentryModule.forRoot(),
+    ScheduleModule.forRoot(),
     OrmModule,
     TerminusModule,
     HttpModule,
     CrawlModule,
     InfluencerModule,
     AccountModule,
+    FileModule,
+    SchedulerModule,
   ],
   controllers: [AppController],
   providers: [

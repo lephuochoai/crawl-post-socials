@@ -17,7 +17,7 @@ export class SocialAccount extends BaseEntity {
   username: string;
 
   @Column({ type: 'varchar', length: 255, nullable: true, unique: true })
-  platformUserId: string;
+  platformUserId: string | null;
 
   @Column({ type: 'text', nullable: true })
   bio: string;
@@ -30,6 +30,9 @@ export class SocialAccount extends BaseEntity {
 
   @Column({ type: 'timestamp', nullable: true })
   joinDate: Date;
+
+  @Column({ type: 'text', nullable: true })
+  avatar: string;
 
   @OneToMany(
     () => Post,

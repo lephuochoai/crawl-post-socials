@@ -7,7 +7,7 @@ export class Post extends BaseEntity {
   @PrimaryGeneratedColumn({ type: 'bigint' })
   id: number;
 
-  @Column({ type: 'text' })
+  @Column({ type: 'text', unique: true })
   url: string;
 
   @Column({ type: 'varchar', length: 255, unique: true })
@@ -25,8 +25,14 @@ export class Post extends BaseEntity {
   @Column({ type: 'bigint' })
   socialAccountId: number;
 
-  @Column({ type: 'boolean' })
+  @Column({ type: 'boolean', default: false })
   isDownloaded: boolean;
+
+  @Column({ type: 'boolean', default: false })
+  isQueued: boolean;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  filePath: string | null;
 
   @ManyToOne(
     () => SocialAccount,
