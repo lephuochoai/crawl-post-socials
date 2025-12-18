@@ -18,7 +18,7 @@ const accountsData = [
   {
     influencerName: 'Taylor Swift',
     platform: SocialPlatform.TWITTER,
-    username: 'taylorswit13',
+    username: 'taylorswift13',
     platformUserId: '17919972',
     bio: "And, baby, that's show business for you. New album The Life of a Showgirl. Available Now",
     followingCount: 0,
