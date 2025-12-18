@@ -1,4 +1,5 @@
 import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
+import * as path from 'path';
 import { InjectRepository } from '@nestjs/typeorm';
 import puppeteer from 'puppeteer-extra';
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
@@ -42,9 +43,12 @@ export class CrawlService implements OnModuleInit, OnModuleDestroy {
     }
 
     puppeteer.use(StealthPlugin());
+    const userDataDir = path.resolve('./user_data');
+    this.logger.log(`Launching browser with userDataDir: ${userDataDir}`);
+
     this.browser = await puppeteer.launch({
       headless: false,
-      userDataDir: './user_data',
+      userDataDir,
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
     });
 
